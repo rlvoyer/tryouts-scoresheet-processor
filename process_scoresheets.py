@@ -19,12 +19,12 @@ class Row(BaseModel):
     scores: List[Optional[float]]
 
 DEFAULT_EVAL_COLUMNS = [
-   "Throwing",
-   "Catching",
-   "Athleticism",
-   "Defense",
-   "Ultimate IQ / Decision Making",
-   "Coachability / Intangibles"
+    "Throwing",
+    "Catching",
+    "Athleticism",
+    "Defense",
+    "Ultimate IQ / Decision Making",
+    "Coachability / Intangibles"
 ]
 
 DEFAULT_MIN_SCORE = 1
