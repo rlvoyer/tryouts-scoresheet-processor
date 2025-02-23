@@ -52,7 +52,7 @@ pip install .
 
 ### Run the program
 
-It expects that you have input directory with images of tryout scoresheets. Pass this as the first parameter to the program. Additionally, it expects the name of a directory to which it will write the output CSVs. This is the second parameter to the program. For example:
+It expects that you have input directory with images of tryout scoresheets. Pass this as the first parameter to the program. Additionally, it expects the name of a directory to which it will write the output CSVs. This directory will be removed if one already exists. This is the second parameter to the program. For example:
 
 Ensure that the Google Gemini API key that you acquired earlier is set in your environment:
 

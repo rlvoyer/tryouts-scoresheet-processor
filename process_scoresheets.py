@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -244,9 +245,18 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if os.path.exists(output_folder):
-        logger.error(f"The specified output folder already exists: {output_folder}")
-        sys.exit(1)
+        logger.warning(f"The specified output folder {output_folder} already exists; removing it.")
 
-    os.mkdir(output_folder)
+        try:
+            shutil.rmtree(output_folder)
+        except PermissionError:
+            logger.error(f"Unable to delete and recreate output folder {output_folder}: permission denied.")
+            sys.exit(1)
+
+    try:
+        os.mkdir(output_folder)
+    except Exception as e:
+        logger.exception(f"Unable to create output folder {output_folder}: {e}")
+        sys.exit(1)
 
     process_scoresheets(image_folder, output_folder)
