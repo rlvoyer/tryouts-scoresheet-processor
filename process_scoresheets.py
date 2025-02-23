@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import sys
 from pathlib import Path
@@ -10,9 +9,8 @@ from google import genai
 from PIL import Image
 from pydantic import BaseModel
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logging.getLogger("google.genai").setLevel(logging.WARNING)
+from utils import logger
+
 
 class Row(BaseModel):
     player_name: str
@@ -32,6 +30,65 @@ def is_valid_score(score: float | None) -> bool:
         return True
 
     return 1 <= score <= 5 or score == -1
+
+def _validate_score(score: Any) -> Optional[float]:
+    if score == "-1" or score is None:
+        return None
+
+    if not isinstance(score, (int, float)) and not is_valid_score(score):
+        raise ValueError(f"Invalid score {score}")
+
+    return float(score)
+
+def _validate_scores(evaluator_name: str, player_name: str, row: Any) -> List[Optional[float]]:
+    if "scores" not in row:
+        raise ValueError(f"No scores in extracted row: {row}")
+
+    scores = row["scores"]
+    
+    if len(scores) != len(EXPECTED_COLUMNS):
+        log_msg = f"Evaluator {evaluator_name} is missing scores for player {player_name} -- please add them manually."
+        logger.warning(log_msg)
+        scores: List[Optional[float]] = [None] * len(EXPECTED_COLUMNS)
+        return scores
+
+    try:
+        scores = [_validate_score(score) for score in scores]
+    except:
+        log_msg = f"Error extracting scores for {player_name} for evaluator {evaluator_name} -- please add them manually."
+        logger.warning(log_msg)
+        scores: List[Optional[float]] = [None] * len(EXPECTED_COLUMNS)
+
+    return scores
+
+def _validate_player_name(evaluator_name: str, row: Dict[str, Any]) -> str:
+    if "player_name" not in row:
+        raise ValueError(f"No player name in extracted row: {row}")
+
+    player_name = row["player_name"]
+
+    if not isinstance(player_name, str):
+        log_msg = f"Error extracting player name ({type(player_name)}/ {player_name}) for evaluator {evaluator_name}"
+        raise ValueError(log_msg)
+
+    return player_name
+
+def _validate_row(evaluator_name: str, row: Dict[str, Any]) -> Row:
+    try:
+        player_name = _validate_player_name(evaluator_name, row)
+    except Exception as e:
+        log_msg = f"Error extracting player name from row {row} for evaluator {evaluator_name} -- please add them manually."
+        logger.warning(log_msg)
+        player_name = ""
+
+    try:
+        scores = _validate_scores(evaluator_name, player_name, row)
+    except Exception as e:
+        log_msg = f"Error extracting scores from row {row} for evaluator {evaluator_name} -- please add them manually."
+        logger.warning(log_msg)
+        scores: List[Optional[float]] = [None] * len(EXPECTED_COLUMNS)
+
+    return Row(player_name=player_name, scores=scores)
 
 def analyze_scoresheet(image_path: Path | str) -> List[Row]:
     """
@@ -77,7 +134,6 @@ def analyze_scoresheet(image_path: Path | str) -> List[Row]:
 
     Return only valid JSON, no additional text.
     """
-
     try:
         response = client.models.generate_content(
             model="gemini-2.0-flash",
@@ -90,37 +146,11 @@ def analyze_scoresheet(image_path: Path | str) -> List[Row]:
     except Exception as e:
         raise ValueError(f"Gemini API call failed: {e}")
 
+    evaluator_name = parse_evaluator_name_from_filename(str(image_path))
+    
     try:
-        data = json.loads(response.text)
-
-        possibly_transformed_data = []
-
-        for record in data:
-            player_name = record["player_name"]
-            if not isinstance(player_name, str):
-                raise ValueError(f"Invalid player name type: {type(player_name)}")
-
-            scores = record["scores"]
-            if len(scores) != len(EXPECTED_COLUMNS):
-                logger.warning(
-                    f"Missing scores for player {player_name} -- please add them manually.")
-                scores = [None, None, None, None, None, None]
-
-            possibly_transformed_scores = []
-            for score in scores:
-                if score == "-1" or score is None:
-                    possibly_transformed_scores.append(None)
-                    continue
-
-                if not isinstance(score, (int, float)) and not is_valid_score(score):
-                    raise ValueError(f"Invalid score {score}")
-
-                possibly_transformed_scores.append(score)
-
-            possibly_transformed_data.append(
-                Row(player_name=player_name, scores=possibly_transformed_scores))
-
-        return possibly_transformed_data
+        data: List[Dict[str, Any]] = json.loads(response.text)
+        return [_validate_row(evaluator_name, row) for row in data]
 
     except (json.JSONDecodeError, KeyError, TypeError) as e:
         raise ValueError(f"Failed to parse Gemini response: {e}\nResponse was: {response.text}")
@@ -133,7 +163,6 @@ def is_valid_dataframe(df: pd.DataFrame) -> bool:
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
-    # Check for duplicate player names
     duplicates = df[df["Player"].duplicated()]["Player"]
     if not duplicates.empty:
         raise ValueError(f"Found duplicate player names: {duplicates.tolist()}")
@@ -167,8 +196,8 @@ def parse_evaluator_name_from_filename(filename: Path | str) -> str:
     Raises:
         ValueError: If filename doesn't contain at least one period
     """
-    name = str(filename)
-    parts = name.split(".", 1)
+    basename = os.path.basename(str(filename))
+    parts = basename.split(".", 1)
 
     if len(parts) < 2:
         raise ValueError(f"Invalid filename format: {filename}. Expected evaluator_name.rest_of_name.extension")
@@ -186,16 +215,25 @@ def process_scoresheets(image_folder: Path | str, output_folder: Path | str) -> 
             logger.warning(f"Input file {filename} has unexpected extension -- skipping")
             continue
 
-        players = analyze_scoresheet(image_path)
+        evaluator_name = parse_evaluator_name_from_filename(filename)
+        output_path = os.path.join(output_folder, f"{evaluator_name}.csv")
+
+        try:
+            players = analyze_scoresheet(image_path)
+        except Exception as e:
+            log_msg = f"Exception occurred while parsing scoresheet from {evaluator_name}: {e}"
+            logger.exception(log_msg)
+            logger.error("Skipping -- please enter data manually.")
+            continue
+
         scores_df = create_dataframe(players)
-        output_filename = parse_evaluator_name_from_filename(filename)
-        output_path = os.path.join(output_folder, f"{output_filename}.csv")
 
         try:
             if is_valid_dataframe(scores_df):
                 scores_df.to_csv(output_path, index=False)
         except Exception as e:
-            logger.exception(f"Failed to generate valid dataframe: {e}")
+            logger.exception(f"Failed to generate valid CSV: {e}")
+            logger.error("Skipping -- please enter data manually.")
 
 if __name__ == "__main__":
     image_folder = sys.argv[1]
