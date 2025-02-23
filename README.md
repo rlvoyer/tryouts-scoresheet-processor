@@ -63,5 +63,7 @@ export GEMINI_API_KEY=...
 Then run it!
 
 ```sh
-python main.py tryouts_images tryouts_scores
+python process_scoresheets.py tryouts_images tryouts_scores
 ```
+
+Be sure that input images are oriented correctly before loading.

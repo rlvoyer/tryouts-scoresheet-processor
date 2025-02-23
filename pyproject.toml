@@ -1,8 +1,10 @@
 [project]
 name = "tryouts-scoresheet-processor"
 version = "0.1.0"
+requires-python = ">=3.12"
 dependencies = [
     "google-genai>=1.2.0",
     "pandas>=2.2.3",
     "pillow>=11.1.0",
+    "pydantic>=2.10.6",
 ]
