@@ -80,7 +80,7 @@ python process_scoresheets.py tryouts_images tryouts_scores
 
 #### Combine scoresheets
 
-The combine_scoresheets.py program requires as input an input folder of scoresheet CSVs, a name for the CSV where the combined output should be written, and a player group file which indicates evaluation groups for each of the players. (The evaluation group file is solely as the basis for sorting the output.)
+The combine_scoresheets.py program requires as input an input folder of scoresheet CSVs, a name for the CSV where the combined output should be written, and a player group file which indicates evaluation groups for each of the players. (The evaluation group file is solely as the basis for sorting the output.) The player group file should contain the same list of player names in the first column (`Player`), and the group number (or identifier) in the second column (`Group`).
 
 You can run combine_scoresheets.py like so:
 
