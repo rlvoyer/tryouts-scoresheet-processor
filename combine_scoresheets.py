@@ -13,7 +13,7 @@ def validate_all_players(original_df: pd.DataFrame, aggregated_df: pd.DataFrame)
     final_players = set(aggregated_df['Player'])
     return original_players == final_players
 
-def combine_scores(input_folder: Path, output_file: Path, evaluation_columns: list[str], include_header: bool) -> None:
+def combine_scores(input_folder: Path, output_file: Path, player_group_lookup_file: Path, evaluation_columns: list[str], include_header: bool) -> None:
     """
     Combine individual evaluator CSVs into a single aggregated CSV
     
@@ -48,7 +48,11 @@ def combine_scores(input_folder: Path, output_file: Path, evaluation_columns: li
         logger.error(f"Some players were lost during aggregation")
         sys.exit(1)
 
-    aggregated_df.to_csv(output_file, index=False, header=include_header)
+    player_group_lookup_df = pd.read_csv(player_group_lookup_file)
+    merged_df = aggregated_df.merge(player_group_lookup_df, on="Player", how="left")
+    sorted_df = merged_df.sort_values(['Group', 'Player']).drop('Group', axis=1)
+
+    sorted_df.to_csv(output_file, index=False, header=include_header)
     logger.info(f"Successfully wrote scores from {len(all_dfs)} scoresheets to {output_file}")
     logger.info(f"Processed {len(all_dfs)} evaluator files with {len(aggregated_df)} unique players")
 
@@ -72,6 +76,13 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--player-group-file",
+        type=Path,
+        required=True,
+        help="CSV file containing player evaluation groups"
+    )
+
+    parser.add_argument(
         "--evaluation-columns",
         type=str,
         nargs="+",
@@ -92,8 +103,12 @@ def parse_args() -> argparse.Namespace:
 
     args.output_file.parent.mkdir(parents=True, exist_ok=True)
 
+    if not args.player_group_file.exists():
+        parser.error(f"Player group input file does not exist: {args.input_folder}")
+
     return args
 
 if __name__ == "__main__":
     args = parse_args()
-    combine_scores(args.input_folder, args.output_file, args.evaluation_columns, args.include_header_row)
+
+    combine_scores(args.input_folder, args.output_file, args.player_group_file, args.evaluation_columns, args.include_header_row)
