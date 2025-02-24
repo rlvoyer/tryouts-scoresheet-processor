@@ -52,7 +52,7 @@ def _validate_scores(evaluation_columns: List[str], min_score: int, max_score: i
     scores = row["scores"]
 
     num_expected_columns = len(evaluation_columns)
-    if len(scores) != num_expected_columns:
+    if len(scores) < num_expected_columns:
         log_msg = f"Evaluator {evaluator_name} is missing scores for player {player_name} -- please add them manually."
         logger.warning(log_msg)
         scores: List[Optional[float]] = [None] * num_expected_columns
@@ -269,7 +269,8 @@ def parse_args() -> argparse.Namespace:
         "--evaluation-columns",
         type=str,
         nargs="+",
-        required=True,
+        default=DEFAULT_EVAL_COLUMNS,
+        required=False,
         help="Space-separated list of evaluation criteria (e.g., 'Throwing Catching Athleticism')"
     )
 
