@@ -20,6 +20,7 @@ def combine_scores(input_folder: Path, output_file: Path, player_group_lookup_fi
     Args:
         input_folder: Directory containing individual evaluator CSVs
         output_file: Path for combined output CSV
+        player_group_lookup_file: Path for a 2-column CSV of player evaluation groups
         evaluation_columns: List of column names to process
         include_header: Whether to include a header row in the output
     """
@@ -40,6 +41,11 @@ def combine_scores(input_folder: Path, output_file: Path, player_group_lookup_fi
 
     aggregated_df = combined_df.groupby('Player').agg({
         col: lambda x: ','.join(x.dropna().astype(str))
+        for col in evaluation_columns
+    }).reset_index()
+
+    aggregated_df = combined_df.groupby('Player').agg({
+        col: 'mean'
         for col in evaluation_columns
     }).reset_index()
 
