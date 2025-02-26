@@ -19,12 +19,10 @@ class Row(BaseModel):
     scores: List[Optional[float]]
 
 DEFAULT_EVAL_COLUMNS = [
-    "Throwing",
-    "Catching",
+    "Throwing & Catching",
     "Athleticism",
-    "Defense",
-    "Ultimate IQ / Decision Making",
-    "Coachability / Intangibles"
+    "Field Awareness",
+    "Teamwork & Attitude"
 ]
 
 DEFAULT_MIN_SCORE = 1
@@ -113,6 +111,7 @@ def analyze_scoresheet(evaluation_columns: List[str], min_score: int, max_score:
         ValueError: If Gemini's response cannot be parsed into the expected format
     """
     image: Image.Image = Image.open(image_path)
+
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     score_range = f"{min_score}-{max_score}"
